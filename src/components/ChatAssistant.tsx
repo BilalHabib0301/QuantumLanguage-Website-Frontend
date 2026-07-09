@@ -16,6 +16,8 @@ const STARTER_PROMPTS = [
   { text: "Show the native crypto functions in Quantum", label: "Crypto Helpers" }
 ];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export const ChatAssistant = () => {
   const { theme } = useTheme();
   const [isOpen, setIsOpen] = React.useState(false);
@@ -70,7 +72,7 @@ Select a quick prompt below or type your questions directly!`
     setIsTyping(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,7 +97,7 @@ Select a quick prompt below or type your questions directly!`
       console.error('Chat API request failed:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: `❌ Connection Error: Make sure the local Quantum backend is running on port 5000.` 
+        content: `❌ Connection Error: Make sure the Quantum backend server is running at ${API_BASE}.` 
       }]);
     } finally {
       setIsTyping(false);
