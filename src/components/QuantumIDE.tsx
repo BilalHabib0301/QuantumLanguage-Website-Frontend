@@ -58,6 +58,7 @@ function runKnownSample(code: string): string[] | null {
 
 export const QuantumIDE = () => {
   const { theme } = useTheme();
+  const executionApiBase = import.meta.env.VITE_EXECUTION_API_URL ?? '/api';
   const starterScript = `print("Hello, Quantum!")`;
   const [files, setFiles] = React.useState<{ [key: string]: string }>(() => {
     const saved = localStorage.getItem('quantum_files');
@@ -207,7 +208,7 @@ srv.start();`
     const dynamicExt = activeFile.substring(activeFile.lastIndexOf('.'));
 
     try {
-      const response = await fetch(`http://localhost:5000/api/execute`, {
+      const response = await fetch(`${executionApiBase}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
