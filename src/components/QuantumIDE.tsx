@@ -222,12 +222,20 @@ srv.start();`
       const data = await response.json();
 
       if (data.success) {
-        // If your backend returns the stdout output
-        setOutput([data.output]);
-      } else {
-        // If your backend or the compiler threw an error
-        setOutput(['Execution Failed:', data.error || data.compilerError || 'Unknown runtime error']);
-      }
+      const finalOutput =
+      data.compiledOutput ||
+      data.output ||
+      "Program executed with no output";
+
+      setOutput(finalOutput.split(/\r?\n/));
+    } else {
+      const errorOutput =
+      data.compilerError ||
+      data.error ||
+      "Unknown runtime error";
+
+      setOutput(["Execution Failed:", ...errorOutput.split(/\r?\n/)]);
+    }
     } catch (error) {
       setOutput([
         'Network Error: Failed to establish connection with execution backend API.',
@@ -243,7 +251,12 @@ srv.start();`
     if (!newFileName) return;
     
     // Check if it already has a valid allowed extension
-    const hasValidExt = newFileName.endsWith('.sa') || newFileName.endsWith('.js') || newFileName.endsWith('.cpp');
+    const hasValidExt =
+    newFileName.endsWith('.sa') ||
+    newFileName.endsWith('.js') ||
+    newFileName.endsWith('.py') ||
+    newFileName.endsWith('.cpp') ||
+    newFileName.endsWith('.c');
     // If it doesn't have an extension, default to .sa
     const name = hasValidExt ? newFileName : `${newFileName}.sa`;
     
@@ -252,11 +265,13 @@ srv.start();`
     // Put a clean default template inside depending on what type of file they make
     let defaultContent = '// New Quantum Script\n';
     if (name.endsWith('.js')) defaultContent = '// New JavaScript File\nconsole.log("Hello from JS!");\n';
+    if (name.endsWith('.py')) defaultContent = '# New Python File\nprint("Hello from Python!")\n';
     if (name.endsWith('.cpp')) defaultContent = '#include <iostream>\n\nint main() {\n    std::cout << "Hello from C++!" << std::endl;\n    return 0;\n}\n';
     
     setFiles(prev => ({ ...prev, [name]: defaultContent }));
     setActiveFile(name);
     setNewFileName('');
+    setIsCreateModalOpen(false);
   };
 
   const deleteFile = (fileName: string) => {
