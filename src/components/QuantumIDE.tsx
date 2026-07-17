@@ -131,17 +131,29 @@ srv.start();`
 
   // Keep the line-number gutter's scroll position in sync with the
   // textarea AND the syntax-highlighted overlay.
+  //
+  // ROOT CAUSE OF THE "CODE TEXT STAYS FROZEN" BUG:
+  // The SyntaxHighlighter <pre> element has overflowY:'hidden' in its
+  // customStyle. Setting pre.scrollTop on an overflow-hidden element has
+  // ZERO visual effect — the element refuses to scroll vertically.
+  // The WRAPPER div (preRef.current) uses overflow-hidden on the CSS class
+  // level, but overflow:hidden elements CAN be scrolled programmatically
+  // via JavaScript (they just don't show a scrollbar or respond to user
+  // input). So:
+  //   - Vertical sync → preRef.current.scrollTop  (the wrapper div)
+  //   - Horizontal sync → pre.scrollLeft          (the inner <pre>, which
+  //                                                has overflowX:'auto')
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     const { scrollTop, scrollLeft } = e.currentTarget;
-    
-    if (preRef.current) {
-  const pre = preRef.current.querySelector("pre");
 
-  if (pre) {
-    pre.scrollTop = scrollTop;
-    pre.scrollLeft = scrollLeft;
-  }
-}
+    if (preRef.current) {
+      // Vertical: scroll the wrapper so the <pre> content shifts into view
+      preRef.current.scrollTop = scrollTop;
+      // Horizontal: scroll the inner <pre> which owns horizontal overflow
+      const pre = preRef.current.querySelector('pre');
+      if (pre) pre.scrollLeft = scrollLeft;
+    }
+
     if (lineNumRef.current) {
       lineNumRef.current.scrollTop = scrollTop;
     }
@@ -232,14 +244,13 @@ if (caretAbsoluteX > visibleRight - bufferX) {
     }
 
     scrollCaretIntoView();
-   if (preRef.current) {
-  const pre = preRef.current.querySelector("pre");
-
-  if (pre) {
-    pre.scrollTop = editor.scrollTop;
-    pre.scrollLeft = editor.scrollLeft;
-  }
-}
+    // Sync the overlay and gutter using the same vertical-on-wrapper,
+    // horizontal-on-inner-pre strategy (see handleScroll comment above).
+    if (preRef.current) {
+      preRef.current.scrollTop = editor.scrollTop;
+      const pre = preRef.current.querySelector('pre');
+      if (pre) pre.scrollLeft = editor.scrollLeft;
+    }
     if (lineNumRef.current) {
       lineNumRef.current.scrollTop = editor.scrollTop;
     }
@@ -254,20 +265,20 @@ if (caretAbsoluteX > visibleRight - bufferX) {
 
     const editor = editorRef.current;
 
-    
-
     scrollCaretIntoView();
 
     const { scrollTop, scrollLeft } = editor;
 
+    // Sync overlay and gutter — vertical on wrapper, horizontal on inner pre.
     if (preRef.current) {
- 
+      preRef.current.scrollTop = scrollTop;
+      const pre = preRef.current.querySelector('pre');
+      if (pre) pre.scrollLeft = scrollLeft;
+    }
 
-  preRef.current.scrollTop = scrollTop;
-  preRef.current.scrollLeft = scrollLeft;
-
- 
-}
+    if (lineNumRef.current) {
+      lineNumRef.current.scrollTop = scrollTop;
+    }
   });
 };
 
@@ -611,7 +622,7 @@ if (caretAbsoluteX > visibleRight - bufferX) {
                     />
                     <div 
                       ref={preRef}
-                      className="absolute inset-0 p-4 md:p-5 font-mono text-xs md:text-sm pointer-events-none overflow-auto leading-[1.6]"
+                      className="absolute inset-0 p-4 md:p-5 font-mono text-xs md:text-sm pointer-events-none overflow-hidden leading-[1.6]"
                     >
                       <SyntaxHighlighter
                         language="javascript"
@@ -662,7 +673,16 @@ if (caretAbsoluteX > visibleRight - bufferX) {
                 </div>
 
                 {/* NEW XTERM WEBSOCKET TERMINAL */}
-                <div className="flex-1 w-full h-full overflow-hidden bg-transparent">
+                <div
+                  className="flex-1 w-full h-full overflow-hidden bg-transparent"
+                  style={{
+                    // FIX: Block scroll chaining from the terminal upward into
+                    // the page. When the xterm wheel handler consumes scroll,
+                    // this boundary prevents any residual deltaY from reaching
+                    // the outer page scroll container.
+                    overscrollBehavior: 'contain',
+                  }}
+                >
                   <QuantumTerminal ref={terminalRef} files={files} activeFile={activeFile} />
                 </div>
 
