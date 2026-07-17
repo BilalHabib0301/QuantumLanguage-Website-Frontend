@@ -530,6 +530,25 @@ const QuantumTerminal =  forwardRef<QuantumTerminalHandle, QuantumTerminalProps>
     const resizeObserver = new ResizeObserver(() => fitAddon.fit());
     resizeObserver.observe(containerRef.current);
 
+    // FIX: Trackpad two-finger scroll — intercept wheel events on the terminal
+    // container and route them directly into xterm's buffer. Without this,
+    // browsers fire a DOM wheel event that travels up to the page scroller
+    // because the xterm canvas element is not a native scrollable element.
+    // We call stopPropagation() + preventDefault() to prevent page scroll,
+    // then manually drive xterm with scrollLines() for a smooth, natural feel.
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const term = termRef.current;
+      if (!term) return;
+      // deltaY > 0 → scroll down (positive lines), < 0 → scroll up
+      // Use a sensitivity factor of 3 lines per 100px of deltaY for
+      // a feel consistent with native terminal emulators.
+      const lines = Math.round((e.deltaY / 100) * 3) || (e.deltaY > 0 ? 1 : -1);
+      term.scrollLines(lines);
+    };
+    containerRef.current.addEventListener('wheel', handleWheel, { passive: false });
+
     const textareaEl = containerRef.current.querySelector('.xterm-helper-textarea');
     const handleFocus = () => setIsFocused(true);
     const handleBlur = () => setIsFocused(false);
@@ -540,6 +559,7 @@ const QuantumTerminal =  forwardRef<QuantumTerminalHandle, QuantumTerminalProps>
       clearTimeout(loadingTimer);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
+      containerRef.current?.removeEventListener('wheel', handleWheel);
       textareaEl?.removeEventListener('focus', handleFocus);
       textareaEl?.removeEventListener('blur', handleBlur);
       term.dispose();
@@ -563,7 +583,19 @@ const QuantumTerminal =  forwardRef<QuantumTerminalHandle, QuantumTerminalProps>
         "relative h-full w-full rounded-md overflow-hidden",
         theme === "dark" ? "bg-[#0D1117]" : "bg-white"
       )}>
-        <div ref={containerRef} className="h-full w-full" />
+        <div
+          ref={containerRef}
+          className="h-full w-full"
+          style={{
+            // FIX: Prevent trackpad scroll from escaping the xterm viewport
+            // and scrolling the outer page. 'touch-action: none' stops the
+            // browser's own touch/trackpad scroll handling on this element,
+            // while 'overscroll-behavior: contain' ensures scroll chaining
+            // is blocked even if a wheel event reaches this container.
+            touchAction: 'none',
+            overscrollBehavior: 'contain',
+          }}
+        />
         {isLoading && (
           <div className={cn(
             "absolute inset-0 flex items-center justify-center",
